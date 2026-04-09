@@ -174,9 +174,9 @@ async function seedDatabase(options = {}) {
     }
   ]);
 
-  // Insert staff
+  // Insert or upsert staff
   const staffCollection = db.collection("staff");
-  const staffResults = await staffCollection.insertMany([
+  const staffSeedDocs = [
     {
       full_name: "Kirtan Patel",
       username: "admin.icc",
@@ -267,18 +267,57 @@ async function seedDatabase(options = {}) {
       is_active: true,
       created_at: new Date().toISOString()
     }
-  ]);
+  ];
+
+  let staffIds = [];
+  if (preserveStaff) {
+    const idsByUsername = new Map();
+    for (const doc of staffSeedDocs) {
+      await staffCollection.updateOne(
+        { username: doc.username },
+        {
+          $set: {
+            full_name: doc.full_name,
+            role: doc.role,
+            employment_type: doc.employment_type,
+            phone: doc.phone,
+            is_active: doc.is_active
+          },
+          $setOnInsert: {
+            username: doc.username,
+            password: doc.password,
+            created_at: doc.created_at
+          }
+        },
+        { upsert: true }
+      );
+    }
+
+    const usernames = staffSeedDocs.map((doc) => doc.username);
+    const existingStaff = await staffCollection
+      .find({ username: { $in: usernames } }, { projection: { _id: 1, username: 1 } })
+      .toArray();
+
+    for (const member of existingStaff) {
+      idsByUsername.set(member.username, member._id);
+    }
+
+    staffIds = staffSeedDocs.map((doc) => idsByUsername.get(doc.username));
+  } else {
+    const staffResults = await staffCollection.insertMany(staffSeedDocs);
+    staffIds = staffSeedDocs.map((_, index) => staffResults.insertedIds[index]);
+  }
 
   // Insert staff availability
   const staffAvailCollection = db.collection("staff_availability");
   const supervisorAndCleanerIds = [
-    staffResults.insertedIds[2], // Neha
-    staffResults.insertedIds[3], // Rohan
-    staffResults.insertedIds[4], // Isha
-    staffResults.insertedIds[5], // Karan
-    staffResults.insertedIds[6], // Maya
-    staffResults.insertedIds[7], // Pooja
-    staffResults.insertedIds[8]  // Arjun
+    staffIds[2], // Neha
+    staffIds[3], // Rohan
+    staffIds[4], // Isha
+    staffIds[5], // Karan
+    staffIds[6], // Maya
+    staffIds[7], // Pooja
+    staffIds[8] // Arjun
   ];
 
   const availabilityDocs = supervisorAndCleanerIds.map(staffId => ({
@@ -313,7 +352,7 @@ async function seedDatabase(options = {}) {
     {
       client_id: clientResults.insertedIds[0],
       service_id: serviceResults.insertedIds[0],
-      supervisor_id: staffResults.insertedIds[2], // Neha
+      supervisor_id: staffIds[2], // Neha
       schedule_date: date,
       start_time: "09:00",
       end_time: null,
@@ -325,7 +364,7 @@ async function seedDatabase(options = {}) {
     {
       client_id: clientResults.insertedIds[1],
       service_id: serviceResults.insertedIds[1],
-      supervisor_id: staffResults.insertedIds[3], // Rohan
+      supervisor_id: staffIds[3], // Rohan
       schedule_date: date,
       start_time: "13:00",
       end_time: null,
@@ -337,7 +376,7 @@ async function seedDatabase(options = {}) {
     {
       client_id: clientResults.insertedIds[2],
       service_id: serviceResults.insertedIds[2],
-      supervisor_id: staffResults.insertedIds[2], // Neha
+      supervisor_id: staffIds[2], // Neha
       schedule_date: new Date(new Date().setDate(new Date().getDate() + 2)).toISOString().slice(0, 10),
       start_time: "10:30",
       end_time: null,
@@ -353,42 +392,42 @@ async function seedDatabase(options = {}) {
   await staffAssignCollection.insertMany([
     {
       schedule_id: scheduleResults.insertedIds[0],
-      staff_id: staffResults.insertedIds[4], // Isha
+      staff_id: staffIds[4], // Isha
       assignment_role: "Cleaner"
     },
     {
       schedule_id: scheduleResults.insertedIds[0],
-      staff_id: staffResults.insertedIds[5], // Karan
+      staff_id: staffIds[5], // Karan
       assignment_role: "Cleaner"
     },
     {
       schedule_id: scheduleResults.insertedIds[0],
-      staff_id: staffResults.insertedIds[6], // Maya
+      staff_id: staffIds[6], // Maya
       assignment_role: "Cleaner"
     },
     {
       schedule_id: scheduleResults.insertedIds[1],
-      staff_id: staffResults.insertedIds[6], // Maya
+      staff_id: staffIds[6], // Maya
       assignment_role: "Cleaner"
     },
     {
       schedule_id: scheduleResults.insertedIds[1],
-      staff_id: staffResults.insertedIds[7], // Pooja
+      staff_id: staffIds[7], // Pooja
       assignment_role: "Cleaner"
     },
     {
       schedule_id: scheduleResults.insertedIds[2],
-      staff_id: staffResults.insertedIds[4], // Isha
+      staff_id: staffIds[4], // Isha
       assignment_role: "Cleaner"
     },
     {
       schedule_id: scheduleResults.insertedIds[2],
-      staff_id: staffResults.insertedIds[5], // Karan
+      staff_id: staffIds[5], // Karan
       assignment_role: "Cleaner"
     },
     {
       schedule_id: scheduleResults.insertedIds[2],
-      staff_id: staffResults.insertedIds[8], // Arjun
+      staff_id: staffIds[8], // Arjun
       assignment_role: "Cleaner"
     }
   ]);
