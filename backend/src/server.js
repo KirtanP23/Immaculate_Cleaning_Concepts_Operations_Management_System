@@ -170,8 +170,49 @@ function normalizeClientType(clientType) {
   return clientType;
 }
 
+async function bootstrapAdminUser(db) {
+  const shouldResetAdminOnStart = process.env.RESET_ADMIN_ON_START === "1";
+  if (!shouldResetAdminOnStart) {
+    return;
+  }
+
+  const username = (process.env.BOOTSTRAP_ADMIN_USERNAME || "admin.icc").trim();
+  const password = process.env.BOOTSTRAP_ADMIN_PASSWORD || "";
+  const fullName = (process.env.BOOTSTRAP_ADMIN_FULL_NAME || "Kirtan Patel").trim();
+
+  if (!username || !password) {
+    console.warn(
+      "Admin bootstrap skipped: set BOOTSTRAP_ADMIN_USERNAME and BOOTSTRAP_ADMIN_PASSWORD when RESET_ADMIN_ON_START=1"
+    );
+    return;
+  }
+
+  const staffCollection = db.collection("staff");
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  await staffCollection.updateOne(
+    { username },
+    {
+      $set: {
+        full_name: fullName,
+        username,
+        password: hashedPassword,
+        role: "Admin",
+        employment_type: "Full-Time",
+        phone: "555-9011",
+        is_active: true,
+        created_at: new Date().toISOString()
+      }
+    },
+    { upsert: true }
+  );
+
+  console.log(`Admin bootstrap completed for username: ${username}`);
+}
+
 async function start() {
   const db = await initDb();
+  await bootstrapAdminUser(db);
 
   const requireAuth = async (req, res, next) => {
     const token = getBearerToken(req);
