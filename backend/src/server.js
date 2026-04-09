@@ -17,12 +17,35 @@ const allowedOrigins = (process.env.CORS_ORIGIN || "")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+function normalizeOrigin(origin) {
+  if (!origin) return "";
+  return origin.replace(/\/$/, "").toLowerCase();
+}
+
+function wildcardToRegex(pattern) {
+  const escaped = pattern
+    .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*/g, ".*");
+  return new RegExp(`^${escaped}$`, "i");
+}
+
+function isOriginAllowed(origin) {
+  const normalizedOrigin = normalizeOrigin(origin);
+  return allowedOrigins.some((allowedOrigin) => {
+    const normalizedAllowed = normalizeOrigin(allowedOrigin);
+    if (normalizedAllowed.includes("*")) {
+      return wildcardToRegex(normalizedAllowed).test(normalizedOrigin);
+    }
+    return normalizedAllowed === normalizedOrigin;
+  });
+}
+
 app.use(
   cors(
     allowedOrigins.length
       ? {
           origin(origin, callback) {
-            if (!origin || allowedOrigins.includes(origin)) {
+            if (!origin || isOriginAllowed(origin)) {
               return callback(null, true);
             }
             return callback(new Error("Not allowed by CORS"));
