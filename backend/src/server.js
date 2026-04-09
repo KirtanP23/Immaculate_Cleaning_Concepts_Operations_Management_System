@@ -6,13 +6,31 @@ const { ObjectId } = require("mongodb");
 const { initDb } = require("./db/init");
 
 const app = express();
-const PORT = 4000;
-const AUTH_SECRET = "icc-prototype-secret";
+const PORT = Number(process.env.PORT) || 4000;
+const AUTH_SECRET = process.env.AUTH_SECRET || "icc-prototype-secret";
 const ADMIN_ROLES = ["Admin", "Owner"];
 const MANAGER_ROLES = ["Admin", "Owner", "Supervisor"];
 const VALID_CLIENT_TYPES = ["Commercial", "Residential"];
 
-app.use(cors());
+const allowedOrigins = (process.env.CORS_ORIGIN || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(
+  cors(
+    allowedOrigins.length
+      ? {
+          origin(origin, callback) {
+            if (!origin || allowedOrigins.includes(origin)) {
+              return callback(null, true);
+            }
+            return callback(new Error("Not allowed by CORS"));
+          }
+        }
+      : {}
+  )
+);
 app.use(express.json());
 
 function normalizeDate(dateString) {

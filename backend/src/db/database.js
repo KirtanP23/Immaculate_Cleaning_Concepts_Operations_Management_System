@@ -1,11 +1,11 @@
 const { MongoClient } = require("mongodb");
 
-// MongoDB Atlas connection string with properly encoded password
-const MONGODB_URI = "mongodb+srv://patelkirtan2308_db_user:Kirtan%401775@dbcluster.bfm1r77.mongodb.net/?retryWrites=true&w=majority";
-const DB_NAME = "icc_management";
+const MONGODB_URI = process.env.MONGODB_URI;
+const DB_NAME = process.env.DB_NAME || "icc_management";
 
 let cachedClient = null;
 let cachedDb = null;
+let connectingClientPromise = null;
 
 /**
  * Get MongoDB client instance (reused across requests)
@@ -22,19 +22,35 @@ async function getClient() {
     return cachedClient;
   }
 
-  const client = new MongoClient(MONGODB_URI, {
-    maxPoolSize: 50,
-    minPoolSize: 10,
-    maxIdleTimeMS: 600000,
-    connectTimeoutMS: 10000,
-    socketTimeoutMS: 30000,
-    serverSelectionTimeoutMS: 5000,
-    retryWrites: true,
-  });
+  if (connectingClientPromise) {
+    return connectingClientPromise;
+  }
 
-  await client.connect();
-  cachedClient = client;
-  return client;
+  if (!MONGODB_URI) {
+    throw new Error("MONGODB_URI is required.");
+  }
+
+  connectingClientPromise = (async () => {
+    const client = new MongoClient(MONGODB_URI, {
+      maxPoolSize: 50,
+      minPoolSize: 10,
+      maxIdleTimeMS: 600000,
+      connectTimeoutMS: 10000,
+      socketTimeoutMS: 30000,
+      serverSelectionTimeoutMS: 5000,
+      retryWrites: true,
+    });
+
+    await client.connect();
+    cachedClient = client;
+    return client;
+  })();
+
+  try {
+    return await connectingClientPromise;
+  } finally {
+    connectingClientPromise = null;
+  }
 }
 
 /**
@@ -58,6 +74,7 @@ async function closeDb() {
     await cachedClient.close();
     cachedClient = null;
     cachedDb = null;
+    connectingClientPromise = null;
   }
 }
 
