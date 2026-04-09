@@ -1,4 +1,9 @@
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:4000").replace(/\/$/, "");
+const DEFAULT_API_URL =
+  typeof window !== "undefined" && window.location.hostname !== "localhost"
+    ? window.location.origin
+    : "http://localhost:4000";
+
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_URL).replace(/\/$/, "");
 let authToken = "";
 
 export function setAuthToken(token) {
