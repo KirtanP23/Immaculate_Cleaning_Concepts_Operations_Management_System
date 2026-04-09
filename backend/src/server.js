@@ -217,8 +217,29 @@ async function seedDemoDataOnStart(db) {
     return;
   }
 
+  const forceSeed = process.env.SEED_DEMO_FORCE === "1";
+  const appMetaCollection = db.collection("app_meta");
+  const existingSeedMarker = await appMetaCollection.findOne({ key: "demo_seed_completed" });
+
+  if (existingSeedMarker && !forceSeed) {
+    console.log("Demo seed skipped: already completed once (set SEED_DEMO_FORCE=1 to reseed).");
+    return;
+  }
+
   const preserveStaff = process.env.SEED_DEMO_PRESERVE_STAFF !== "0";
   await seedDatabase({ db, preserveStaff });
+
+  await appMetaCollection.updateOne(
+    { key: "demo_seed_completed" },
+    {
+      $set: {
+        key: "demo_seed_completed",
+        completed_at: new Date().toISOString(),
+        preserve_staff: preserveStaff
+      }
+    },
+    { upsert: true }
+  );
 }
 
 async function start() {
