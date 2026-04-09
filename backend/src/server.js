@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const { ObjectId } = require("mongodb");
 const { initDb } = require("./db/init");
+const { seedDatabase } = require("./db/seed");
 
 const app = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -210,8 +211,19 @@ async function bootstrapAdminUser(db) {
   console.log(`Admin bootstrap completed for username: ${username}`);
 }
 
+async function seedDemoDataOnStart(db) {
+  const shouldSeedDemoOnStart = process.env.SEED_DEMO_ON_START === "1";
+  if (!shouldSeedDemoOnStart) {
+    return;
+  }
+
+  const preserveStaff = process.env.SEED_DEMO_PRESERVE_STAFF !== "0";
+  await seedDatabase({ db, preserveStaff });
+}
+
 async function start() {
   const db = await initDb();
+  await seedDemoDataOnStart(db);
   await bootstrapAdminUser(db);
 
   const requireAuth = async (req, res, next) => {

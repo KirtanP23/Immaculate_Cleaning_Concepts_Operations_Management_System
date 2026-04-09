@@ -1,9 +1,12 @@
 const { initDb } = require("./init");
 const { ObjectId } = require("mongodb");
 
-async function seed() {
-  const db = await initDb();
-  const preserveStaff = process.argv.includes("--preserve-staff") || process.env.PRESERVE_STAFF === "1";
+async function seedDatabase(options = {}) {
+  const db = options.db || (await initDb());
+  const preserveStaff =
+    typeof options.preserveStaff === "boolean"
+      ? options.preserveStaff
+      : process.argv.includes("--preserve-staff") || process.env.PRESERVE_STAFF === "1";
 
   const now = new Date();
   const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
@@ -390,12 +393,17 @@ async function seed() {
     }
   ]);
 
-  console.log(
-    `Database seeded successfully. preserveStaff=${preserveStaff ? "enabled" : "disabled"}`
-  );
+  const message =
+    `Database seeded successfully. preserveStaff=${preserveStaff ? "enabled" : "disabled"}`;
+  console.log(message);
+  return { preserveStaff, message };
 }
 
-seed().catch((error) => {
-  console.error("Seed failed:", error);
-  process.exit(1);
-});
+if (require.main === module) {
+  seedDatabase().catch((error) => {
+    console.error("Seed failed:", error);
+    process.exit(1);
+  });
+}
+
+module.exports = { seedDatabase };
